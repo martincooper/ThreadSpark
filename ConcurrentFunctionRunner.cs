@@ -74,15 +74,14 @@ namespace ThreadStrike
             var faultedTask = taskResults
                 .Select(_ => _.Task)
                 .FirstOrDefault(_ => _.IsFaulted);
-
+            
             if (faultedTask != null)
                 return Try<TReturnType[]>(faultedTask.GetException());
 
-            var results = taskResults
+            return Try(taskResults
                 .OrderBy(_ => _.Idx)
-                .Select(_ => _.Task.Result);
-
-            return Try(results.ToArray());
+                .Select(_ => _.Task.Result)
+                .ToArray());
         }
         
         private static TReturnType ExecuteFunc<TReturnType>(ConcurrentQueue<Func<TReturnType>> funcQueue, SemaphoreSlim semaphore)

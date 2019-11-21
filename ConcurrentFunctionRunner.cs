@@ -28,7 +28,7 @@ namespace ThreadStrike
         /// <returns>Returns a collection of results.</returns>
         public Try<TReturnType>[] Run<TReturnType>(IEnumerable<Func<TReturnType>> funcs)
         {
-            var tasks = Execute(funcs);
+            var tasks = Execute(funcs, false);
             return ProcessAllTasks(tasks);
         }
         
@@ -41,19 +41,22 @@ namespace ThreadStrike
         /// <returns>Returns a collection of results if all succeed, else first failing exception.</returns>
         public Try<TReturnType[]> RunUntilFirstFail<TReturnType>(IEnumerable<Func<TReturnType>> funcs)
         {
-            var tasks = Execute(funcs);
+            var tasks = Execute(funcs, true);
             return ProcessTasksAllOrFail(tasks);
         }
         
-        private (int Idx, Try<TReturnType> Task)[] Execute<TReturnType>(IEnumerable<Func<TReturnType>> funcs)
+        private (int Idx, Try<TReturnType> Task)[] Execute<TReturnType>(
+            IEnumerable<Func<TReturnType>> funcs,
+            bool failOnFirstError)
         {
             var allFuncs = funcs.ToArray();
             var funcQueue = new ConcurrentQueue<Func<TReturnType>>(allFuncs);
-
+            var tokenManager = new CancellationTokenManager(failOnFirstError);
+            
             using (var semaphore = new SemaphoreSlim(MaxThreads))
             {
                 var results = allFuncs
-                    .Select((func, idx) => (Idx: idx, Task: Task.Run(() => ExecuteFunc(funcQueue, semaphore))))
+                    .Select((func, idx) => (Idx: idx, Task: Task.Run(() => ExecuteFunc(funcQueue, tokenManager, semaphore))))
                     .ToArray();
 
                 // Ensure that we wait until all the running tasks are complete so the
@@ -73,8 +76,7 @@ namespace ThreadStrike
                 .ToArray();
         }
         
-        // TODO : Handle failing when FIRST error occurs not at end.
-        private Try<TReturnType[]> ProcessTasksAllOrFail<TReturnType>((int Idx, Try<TReturnType> Result)[] taskResults)
+        private static Try<TReturnType[]> ProcessTasksAllOrFail<TReturnType>((int Idx, Try<TReturnType> Result)[] taskResults)
         {
             var faultedTask = taskResults
                 .Select(_ => _.Result)
@@ -89,8 +91,9 @@ namespace ThreadStrike
                 .ToArray());
         }
         
-        private Try<TReturnType> ExecuteFunc<TReturnType>(
-            ConcurrentQueue<Func<TReturnType>> funcQueue, 
+        private static Try<TReturnType> ExecuteFunc<TReturnType>(
+            ConcurrentQueue<Func<TReturnType>> funcQueue,
+            CancellationTokenManager tokenManager,
             SemaphoreSlim semaphore)
         {
             try
@@ -98,10 +101,24 @@ namespace ThreadStrike
                 // Wait so we limit the number of concurrent threads.
                 semaphore.Wait();
 
+                if (tokenManager.IsCancellationRequested)
+                    Try<TReturnType>(new TaskCanceledException());
+                
                 // Get the functions to run from a queue so they are started in the order received.
-                return funcQueue.TryDequeue(out var func)
-                    ? Try(() => func()) 
-                    : Try<TReturnType>(new Exception("Concurrent Function Error. No items found in queue."));
+                if (funcQueue.TryDequeue(out var func))
+                {
+                    // Run the function wrapped in a Try, which ensures we catch
+                    // any exceptions ourselves and the Task will never be faulted.
+                    var result = Try(() => func()).Strict();
+                    
+                    // If the task threw an exception, if required,
+                    // set the cancellation token to cancel any pending tasks. 
+                    tokenManager.SetCancelIfError(result);
+                    
+                    return result;
+                }
+
+                return Try<TReturnType>(new Exception("Concurrent Function Error. No items found in queue."));
             }
             finally { semaphore.Release(); }
         }

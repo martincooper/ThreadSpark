@@ -99,11 +99,9 @@ namespace ThreadStrike
                 semaphore.Wait();
 
                 // Get the functions to run from a queue so they are started in the order received.
-                if (funcQueue.TryDequeue(out var func))
-                    return Try(() => func());
-
-                // Should never happen as we only take from the queue when it's not empty.
-                return Try<TReturnType>(new Exception("Concurrent Function Error. No items found in queue."));
+                return funcQueue.TryDequeue(out var func)
+                    ? Try(() => func()) 
+                    : Try<TReturnType>(new Exception("Concurrent Function Error. No items found in queue."));
             }
             finally { semaphore.Release(); }
         }

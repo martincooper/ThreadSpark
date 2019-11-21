@@ -10,42 +10,47 @@ using ThreadStrike.Helpers;
 
 namespace ThreadStrike
 {
-    public static class ConcurrentFunctionRunner
+    public class ConcurrentFunctionRunner
     {
+        public ConcurrentFunctionRunner(int maxThreads)
+        {
+            MaxThreads = maxThreads;
+        }
+        
+        public int MaxThreads { get; }
+        
         /// <summary>
         /// Runs all the supplied functions concurrently limited to the specified Max Threads.
         /// Returns a collection of Try results, one for each request.
         /// </summary>
         /// <param name="funcs">The functions to run concurrently.</param>
-        /// <param name="maxThreads">The maximum number of threads to run concurrently.</param>
         /// <typeparam name="TReturnType">The functions return type.</typeparam>
         /// <returns>Returns a collection of results.</returns>
-        public static Try<TReturnType>[] Run<TReturnType>(IEnumerable<Func<TReturnType>> funcs, int maxThreads)
+        public Try<TReturnType>[] Run<TReturnType>(IEnumerable<Func<TReturnType>> funcs)
         {
-            var tasks = Execute(funcs, maxThreads);
+            var tasks = Execute(funcs);
             return ProcessAllTasks(tasks);
-        }        
+        }
         
         /// <summary>
         /// Runs all the supplied functions concurrently limited to the specified Max Threads.
         /// Will run until one fails with an exception, and will return early, not running remaining functions.
         /// </summary>
         /// <param name="funcs">The functions to run concurrently.</param>
-        /// <param name="maxThreads">The maximum number of threads to run concurrently.</param>
         /// <typeparam name="TReturnType">The functions return type.</typeparam>
         /// <returns>Returns a collection of results if all succeed, else first failing exception.</returns>
-        public static Try<TReturnType[]> RunUntilFirstFail<TReturnType>(IEnumerable<Func<TReturnType>> funcs, int maxThreads)
+        public Try<TReturnType[]> RunUntilFirstFail<TReturnType>(IEnumerable<Func<TReturnType>> funcs)
         {
-            var tasks = Execute(funcs, maxThreads);
+            var tasks = Execute(funcs);
             return ProcessTasksAllOrFail(tasks);
         }
         
-        private static (int Idx, Task<TReturnType> Task)[] Execute<TReturnType>(IEnumerable<Func<TReturnType>> funcs, int maxThreads)
+        private (int Idx, Try<TReturnType> Task)[] Execute<TReturnType>(IEnumerable<Func<TReturnType>> funcs)
         {
             var allFuncs = funcs.ToArray();
             var funcQueue = new ConcurrentQueue<Func<TReturnType>>(allFuncs);
 
-            using (var semaphore = new SemaphoreSlim(maxThreads))
+            using (var semaphore = new SemaphoreSlim(MaxThreads))
             {
                 var results = allFuncs
                     .Select((func, idx) => (Idx: idx, Task: Task.Run(() => ExecuteFunc(funcQueue, semaphore))))
@@ -56,35 +61,37 @@ namespace ThreadStrike
                 var runningTasks = results.Select(_ => _.Task).ToArray<Task>();
                 Task.WaitAll(runningTasks);
 
-                return results;
+                return results.Select(_ => (_.Idx,  _.Task.Result)).ToArray();
             }
         }
         
-        private static Try<TReturnType>[] ProcessAllTasks<TReturnType>((int Idx, Task<TReturnType> Task)[] taskResults)
+        private static Try<TReturnType>[] ProcessAllTasks<TReturnType>((int Idx, Try<TReturnType> Result)[] taskResults)
         {
             return taskResults
                 .OrderBy(_ => _.Idx)
-                .Select(_ => _.Task.IsFaulted ? Try<TReturnType>(_.Task.GetException()) : Try(_.Task.Result))
+                .Select(_ => _.Result)
                 .ToArray();
         }
         
         // TODO : Handle failing when FIRST error occurs not at end.
-        private static Try<TReturnType[]> ProcessTasksAllOrFail<TReturnType>((int Idx, Task<TReturnType> Task)[] taskResults)
+        private Try<TReturnType[]> ProcessTasksAllOrFail<TReturnType>((int Idx, Try<TReturnType> Result)[] taskResults)
         {
             var faultedTask = taskResults
-                .Select(_ => _.Task)
-                .FirstOrDefault(_ => _.IsFaulted);
+                .Select(_ => _.Result)
+                .FirstOrDefault(_ => _.IsFail());
             
             if (faultedTask != null)
                 return Try<TReturnType[]>(faultedTask.GetException());
 
             return Try(taskResults
                 .OrderBy(_ => _.Idx)
-                .Select(_ => _.Task.Result)
+                .Select(_ => _.Result.GetValue())
                 .ToArray());
         }
         
-        private static TReturnType ExecuteFunc<TReturnType>(ConcurrentQueue<Func<TReturnType>> funcQueue, SemaphoreSlim semaphore)
+        private Try<TReturnType> ExecuteFunc<TReturnType>(
+            ConcurrentQueue<Func<TReturnType>> funcQueue, 
+            SemaphoreSlim semaphore)
         {
             try
             {
@@ -93,10 +100,10 @@ namespace ThreadStrike
 
                 // Get the functions to run from a queue so they are started in the order received.
                 if (funcQueue.TryDequeue(out var func))
-                    return func();
-                
+                    return Try(() => func());
+
                 // Should never happen as we only take from the queue when it's not empty.
-                throw new Exception("Concurrent FunctionError. No items found in queue.");
+                return Try<TReturnType>(new Exception("Concurrent Function Error. No items found in queue."));
             }
             finally { semaphore.Release(); }
         }

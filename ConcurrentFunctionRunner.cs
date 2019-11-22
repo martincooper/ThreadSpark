@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using LanguageExt;
+using ThreadStrike.Extensions;
 using static LanguageExt.Prelude;
 using ThreadStrike.Helpers;
 
@@ -14,6 +15,9 @@ namespace ThreadStrike
     {
         public ConcurrentFunctionRunner(int maxThreads)
         {
+            if (maxThreads <= 0)
+                throw new ArgumentOutOfRangeException(nameof(maxThreads), "Max threads cannot be less than 1.");
+            
             MaxThreads = maxThreads;
         }
         
@@ -59,8 +63,8 @@ namespace ThreadStrike
             IEnumerable<Func<TReturnType>> funcs,
             bool failOnFirstError)
         {
-            var allFuncs = funcs.ToArray();
-            var funcQueue = new ConcurrentQueue<Func<TReturnType>>(allFuncs);
+            var allFuncs = funcs.Select((func, idx) => new FunctionItem<TReturnType>(func, idx)).ToArray(); 
+            var funcQueue = new ConcurrentQueue<FunctionItem<TReturnType>>(allFuncs);
             var tokenManager = new CancellationTokenManager(failOnFirstError);
             
             using (var semaphore = new SemaphoreSlim(MaxThreads))
@@ -74,7 +78,7 @@ namespace ThreadStrike
                 var runningTasks = results.Select(_ => _.Task).ToArray<Task>();
                 Task.WaitAll(runningTasks);
 
-                return results.Select(_ => (_.Idx,  _.Task.Result)).ToArray();
+                return results.Select(_ => (_.Idx, _.Task.Result)).ToArray();
             }
         }
         
@@ -102,7 +106,7 @@ namespace ThreadStrike
         }
         
         private static Try<TReturnType> ExecuteFunc<TReturnType>(
-            ConcurrentQueue<Func<TReturnType>> funcQueue,
+            ConcurrentQueue<FunctionItem<TReturnType>> funcQueue,
             CancellationTokenManager tokenManager,
             SemaphoreSlim semaphore)
         {
@@ -115,15 +119,18 @@ namespace ThreadStrike
                     Try<TReturnType>(new TaskCanceledException());
                 
                 // Get the functions to run from a queue so they are started in the order received.
-                if (funcQueue.TryDequeue(out var func))
+                if (funcQueue.TryDequeue(out var funcItem))
                 {
                     // Run the function wrapped in a Try, which ensures we catch
                     // any exceptions ourselves and the Task will never be faulted.
-                    var result = Try(() => func()).Strict();
+                    var result = Try(() => funcItem.Func()).Strict();
                     
                     // If the task threw an exception, if required,
                     // set the cancellation token to cancel any pending tasks. 
                     tokenManager.SetCancelIfError(result);
+                    
+                    //Notification of progress.
+                    //NotifyProgress(new ProgressItem(result, funcItem.Idx) )
                     
                     return result;
                 }

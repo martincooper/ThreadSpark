@@ -1,7 +1,7 @@
 using System;
 using LanguageExt;
 
-namespace ThreadStrike.Helpers
+namespace ThreadStrike.Extensions
 {
     public static class TryExtensions
     {

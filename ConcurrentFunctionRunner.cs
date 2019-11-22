@@ -19,6 +19,11 @@ namespace ThreadStrike
         
         public int MaxThreads { get; }
         
+        public RunnerResult<Try<TReturnType>[]> BeginRun<TReturnType>(IEnumerable<Func<TReturnType>> funcs)
+        {
+            return new RunnerResult<Try<TReturnType>[]>(Task.Run(() => Run(funcs)));
+        }
+        
         /// <summary>
         /// Runs all the supplied functions concurrently limited to the specified Max Threads.
         /// Returns a collection of Try results, one for each request.
@@ -31,15 +36,20 @@ namespace ThreadStrike
             var tasks = Execute(funcs, false);
             return ProcessAllTasks(tasks);
         }
+
+        public RunnerResult<Try<TReturnType[]>> BeginRunUntilError<TReturnType>(IEnumerable<Func<TReturnType>> funcs)
+        {
+            return new RunnerResult<Try<TReturnType[]>>(Task.Run(() => RunUntilError(funcs)));
+        }
         
         /// <summary>
         /// Runs all the supplied functions concurrently limited to the specified Max Threads.
-        /// Will run until one fails with an exception, and will return early, not running remaining functions.
+        /// Will run until a task fails with an exception, and will return early, not running remaining functions.
         /// </summary>
         /// <param name="funcs">The functions to run concurrently.</param>
         /// <typeparam name="TReturnType">The functions return type.</typeparam>
         /// <returns>Returns a collection of results if all succeed, else first failing exception.</returns>
-        public Try<TReturnType[]> RunUntilFirstFail<TReturnType>(IEnumerable<Func<TReturnType>> funcs)
+        public Try<TReturnType[]> RunUntilError<TReturnType>(IEnumerable<Func<TReturnType>> funcs)
         {
             var tasks = Execute(funcs, true);
             return ProcessTasksAllOrFail(tasks);

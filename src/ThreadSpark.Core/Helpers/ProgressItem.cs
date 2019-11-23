@@ -1,6 +1,6 @@
 using LanguageExt;
 
-namespace ThreadSpark.Helpers
+namespace ThreadSpark.Core.Helpers
 {
     public class ProgressItem<TResultType>
     {

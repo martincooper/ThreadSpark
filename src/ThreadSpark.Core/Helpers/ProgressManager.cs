@@ -1,8 +1,9 @@
 using System;
 using System.Threading;
 using LanguageExt;
+using ThreadSpark.Helpers;
 
-namespace ThreadSpark.Helpers
+namespace ThreadSpark.Core.Helpers
 {
     /// <summary>
     /// ProgressManager class.

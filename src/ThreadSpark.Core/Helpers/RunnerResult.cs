@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace ThreadSpark.Helpers
+namespace ThreadSpark.Core.Helpers
 {
     public class RunnerResult<TResultType>
     {

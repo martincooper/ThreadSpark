@@ -1,7 +1,7 @@
 using System.Threading;
 using LanguageExt;
 
-namespace ThreadSpark.Helpers
+namespace ThreadSpark.Core.Helpers
 {
     /// <summary>
     /// CancellationTokenManager class.

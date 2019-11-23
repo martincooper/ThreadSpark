@@ -23,61 +23,83 @@ namespace ThreadStrike
         
         public int MaxThreads { get; }
         
+        /// <summary>
+        /// Runs all the supplied functions concurrently, limited to the specified Max Threads.
+        /// Returns a RunnerResult object which can be used to wait for all tasks
+        /// to be finished before checking the results.
+        /// Runs all, any errors returned in the Try Result.
+        /// </summary>
+        /// <param name="funcs">The functions to run concurrently.</param>
+        /// <param name="settings">Settings if required.</param>
+        /// <typeparam name="TResultType">The functions result type.</typeparam>
+        /// <returns>Returns a collection of results.</returns>
         public RunnerResult<Try<TResultType>[]> BeginRun<TResultType>(
             IEnumerable<Func<TResultType>> funcs,
-            IProgress<ProgressItem<TResultType>> progress = null)
+            ConcurrentFunctionSettings<TResultType> settings = null)
         {
-            return new RunnerResult<Try<TResultType>[]>(Task.Run(() => Run(funcs, progress)));
+            return new RunnerResult<Try<TResultType>[]>(Task.Run(() => Run(funcs, settings)));
         }
 
         /// <summary>
-        /// Runs all the supplied functions concurrently limited to the specified Max Threads.
-        /// Returns a collection of Try results, one for each request.
+        /// Runs all the supplied functions concurrently, limited to the specified Max Threads.
+        /// Blocks the executing thread until finished, then returns a
+        /// collection of Try results, one for each request.
         /// </summary>
         /// <param name="funcs">The functions to run concurrently.</param>
-        /// <param name="progress">IProgress implementation if required.</param>
+        /// <param name="settings">Settings if required.</param>
         /// <typeparam name="TResultType">The functions result type.</typeparam>
         /// <returns>Returns a collection of results.</returns>
         public Try<TResultType>[] Run<TResultType>(
             IEnumerable<Func<TResultType>> funcs,
-            IProgress<ProgressItem<TResultType>> progress = null)
+            ConcurrentFunctionSettings<TResultType> settings = null)
         {
-            var tasks = Execute(funcs, false, progress);
+            var tasks = Execute(funcs, false, settings);
             return ProcessAllTasks(tasks);
         }
 
+        /// <summary>
+        /// Runs all the supplied functions concurrently, limited to the specified Max Threads.
+        /// Returns a RunnerResult object which can be used to wait for all tasks
+        /// to be finished before checking the results.
+        /// Runs until the first error and aborts, else returns all results.
+        /// </summary>
+        /// <param name="funcs">The functions to run concurrently.</param>
+        /// <param name="settings">Settings if required.</param>
+        /// <typeparam name="TResultType">The functions result type.</typeparam>
+        /// <returns>Returns a collection of results.</returns>
         public RunnerResult<Try<TResultType[]>> BeginRunUntilError<TResultType>(
             IEnumerable<Func<TResultType>> funcs,
-            IProgress<ProgressItem<TResultType>> progress = null)
+            ConcurrentFunctionSettings<TResultType> settings = null)
         {
-            return new RunnerResult<Try<TResultType[]>>(Task.Run(() => RunUntilError(funcs, progress)));
+            return new RunnerResult<Try<TResultType[]>>(Task.Run(() => RunUntilError(funcs, settings)));
         }
         
         /// <summary>
         /// Runs all the supplied functions concurrently limited to the specified Max Threads.
-        /// Will run until a task fails with an exception, and will return early, not running remaining functions.
+        /// Blocks the executing thread until finished.
+        /// Will run until a task fails with an exception, and will return early, not running remaining tasks.
         /// </summary>
         /// <param name="funcs">The functions to run concurrently.</param>
-        /// <param name="progress">IProgress implementation if required.</param>
+        /// <param name="settings">Settings if required.</param>
         /// <typeparam name="TResultType">The functions result type.</typeparam>
         /// <returns>Returns a collection of results if all succeed, else first failing exception.</returns>
         public Try<TResultType[]> RunUntilError<TResultType>(
             IEnumerable<Func<TResultType>> funcs,
-            IProgress<ProgressItem<TResultType>> progress = null)
+            ConcurrentFunctionSettings<TResultType> settings = null)
         {
-            var tasks = Execute(funcs, true, progress);
+            var tasks = Execute(funcs, true, settings);
             return ProcessTasksAllOrFail(tasks);
         }
         
         private (int Idx, Try<TResultType> Task)[] Execute<TResultType>(
             IEnumerable<Func<TResultType>> funcs,
             bool failOnFirstError,
-            IProgress<ProgressItem<TResultType>> progress = null)
+            ConcurrentFunctionSettings<TResultType> settings = null)
         {
             var allFuncs = funcs.Select((func, idx) => new FunctionItem<TResultType>(func, idx)).ToArray(); 
             var funcQueue = new ConcurrentQueue<FunctionItem<TResultType>>(allFuncs);
-            var tokenManager = new CancellationTokenManager(failOnFirstError);
-            var progressManager = new ProgressManager<TResultType>(progress, allFuncs.Length);
+            var tokenManager = new CancellationTokenManager(settings?.CancellationToken, failOnFirstError);
+            var progressManager = new ProgressManager<TResultType>(settings?.Progress, allFuncs.Length);
             
             using (var semaphore = new SemaphoreSlim(MaxThreads))
             {

@@ -9,8 +9,9 @@ namespace ThreadStrike.Helpers
     /// </summary>
     public class CancellationTokenManager
     {
-        public CancellationTokenManager(bool cancelOnError = false)
+        public CancellationTokenManager(CancellationToken? externalCancellationToken, bool cancelOnError = false)
         {
+            ExternalCancellationToken = externalCancellationToken;
             Source = new CancellationTokenSource();
             CancelOnError = cancelOnError;
         }
@@ -21,14 +22,30 @@ namespace ThreadStrike.Helpers
         public bool CancelOnError { get; } 
         
         /// <summary>
-        /// Underlying Cancellation Token Source.
+        /// Cancellation Token Source to abort tasks when first fails.
         /// </summary>
         public CancellationTokenSource Source { get; }
 
         /// <summary>
+        /// External Cancellation Token so tasks can be aborted by caller.
+        /// </summary>
+        public CancellationToken? ExternalCancellationToken { get; }
+
+        /// <summary>
         /// Is cancellation requested.
         /// </summary>
-        public bool IsCancellationRequested => CancelOnError && Source.IsCancellationRequested;
+        public bool IsCancellationRequested
+        {
+            get
+            {
+                // Return true if use has aborted.
+                if (ExternalCancellationToken.HasValue && ExternalCancellationToken.Value.IsCancellationRequested)
+                    return true;
+                
+                // Return true if an error was thrown and we want to abort subsequent tasks.
+                return CancelOnError && Source.IsCancellationRequested;
+            }
+        }
 
         /// <summary>
         /// Signals the cancellation if the passed result is a Failure.

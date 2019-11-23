@@ -1,2 +1,2 @@
-# ThreadStrike
-C# Library for Threading and Async Abstractions
+# ThreadSpark
+C# Library for Functional Threading and Async Abstractions

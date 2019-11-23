@@ -23,27 +23,34 @@ namespace ThreadStrike
         
         public int MaxThreads { get; }
         
-        public RunnerResult<Try<TReturnType>[]> BeginRun<TReturnType>(IEnumerable<Func<TReturnType>> funcs)
+        public RunnerResult<Try<TResultType>[]> BeginRun<TResultType>(
+            IEnumerable<Func<TResultType>> funcs,
+            IProgress<ProgressItem<TResultType>> progress = null)
         {
-            return new RunnerResult<Try<TReturnType>[]>(Task.Run(() => Run(funcs)));
+            return new RunnerResult<Try<TResultType>[]>(Task.Run(() => Run(funcs, progress)));
         }
-        
+
         /// <summary>
         /// Runs all the supplied functions concurrently limited to the specified Max Threads.
         /// Returns a collection of Try results, one for each request.
         /// </summary>
         /// <param name="funcs">The functions to run concurrently.</param>
-        /// <typeparam name="TReturnType">The functions return type.</typeparam>
+        /// <param name="progress">IProgress implementation if required.</param>
+        /// <typeparam name="TResultType">The functions result type.</typeparam>
         /// <returns>Returns a collection of results.</returns>
-        public Try<TReturnType>[] Run<TReturnType>(IEnumerable<Func<TReturnType>> funcs)
+        public Try<TResultType>[] Run<TResultType>(
+            IEnumerable<Func<TResultType>> funcs,
+            IProgress<ProgressItem<TResultType>> progress = null)
         {
-            var tasks = Execute(funcs, false);
+            var tasks = Execute(funcs, false, progress);
             return ProcessAllTasks(tasks);
         }
 
-        public RunnerResult<Try<TReturnType[]>> BeginRunUntilError<TReturnType>(IEnumerable<Func<TReturnType>> funcs)
+        public RunnerResult<Try<TResultType[]>> BeginRunUntilError<TResultType>(
+            IEnumerable<Func<TResultType>> funcs,
+            IProgress<ProgressItem<TResultType>> progress = null)
         {
-            return new RunnerResult<Try<TReturnType[]>>(Task.Run(() => RunUntilError(funcs)));
+            return new RunnerResult<Try<TResultType[]>>(Task.Run(() => RunUntilError(funcs, progress)));
         }
         
         /// <summary>
@@ -51,26 +58,31 @@ namespace ThreadStrike
         /// Will run until a task fails with an exception, and will return early, not running remaining functions.
         /// </summary>
         /// <param name="funcs">The functions to run concurrently.</param>
-        /// <typeparam name="TReturnType">The functions return type.</typeparam>
+        /// <param name="progress">IProgress implementation if required.</param>
+        /// <typeparam name="TResultType">The functions result type.</typeparam>
         /// <returns>Returns a collection of results if all succeed, else first failing exception.</returns>
-        public Try<TReturnType[]> RunUntilError<TReturnType>(IEnumerable<Func<TReturnType>> funcs)
+        public Try<TResultType[]> RunUntilError<TResultType>(
+            IEnumerable<Func<TResultType>> funcs,
+            IProgress<ProgressItem<TResultType>> progress = null)
         {
-            var tasks = Execute(funcs, true);
+            var tasks = Execute(funcs, true, progress);
             return ProcessTasksAllOrFail(tasks);
         }
         
-        private (int Idx, Try<TReturnType> Task)[] Execute<TReturnType>(
-            IEnumerable<Func<TReturnType>> funcs,
-            bool failOnFirstError)
+        private (int Idx, Try<TResultType> Task)[] Execute<TResultType>(
+            IEnumerable<Func<TResultType>> funcs,
+            bool failOnFirstError,
+            IProgress<ProgressItem<TResultType>> progress = null)
         {
-            var allFuncs = funcs.Select((func, idx) => new FunctionItem<TReturnType>(func, idx)).ToArray(); 
-            var funcQueue = new ConcurrentQueue<FunctionItem<TReturnType>>(allFuncs);
+            var allFuncs = funcs.Select((func, idx) => new FunctionItem<TResultType>(func, idx)).ToArray(); 
+            var funcQueue = new ConcurrentQueue<FunctionItem<TResultType>>(allFuncs);
             var tokenManager = new CancellationTokenManager(failOnFirstError);
+            var progressManager = new ProgressManager<TResultType>(progress, allFuncs.Length);
             
             using (var semaphore = new SemaphoreSlim(MaxThreads))
             {
                 var results = allFuncs
-                    .Select((func, idx) => (Idx: idx, Task: Task.Run(() => ExecuteFunc(funcQueue, tokenManager, semaphore))))
+                    .Select((func, idx) => (Idx: idx, Task: Task.Run(() => ExecuteFunc(funcQueue, tokenManager, progressManager, semaphore))))
                     .ToArray();
 
                 // Ensure that we wait until all the running tasks are complete so the
@@ -82,7 +94,7 @@ namespace ThreadStrike
             }
         }
         
-        private static Try<TReturnType>[] ProcessAllTasks<TReturnType>((int Idx, Try<TReturnType> Result)[] taskResults)
+        private static Try<TResultType>[] ProcessAllTasks<TResultType>((int Idx, Try<TResultType> Result)[] taskResults)
         {
             return taskResults
                 .OrderBy(_ => _.Idx)
@@ -90,14 +102,14 @@ namespace ThreadStrike
                 .ToArray();
         }
         
-        private static Try<TReturnType[]> ProcessTasksAllOrFail<TReturnType>((int Idx, Try<TReturnType> Result)[] taskResults)
+        private static Try<TResultType[]> ProcessTasksAllOrFail<TResultType>((int Idx, Try<TResultType> Result)[] taskResults)
         {
             var faultedTask = taskResults
                 .Select(_ => _.Result)
                 .FirstOrDefault(_ => _.IsFail());
             
             if (faultedTask != null)
-                return Try<TReturnType[]>(faultedTask.GetException());
+                return Try<TResultType[]>(faultedTask.GetException());
 
             return Try(taskResults
                 .OrderBy(_ => _.Idx)
@@ -105,9 +117,10 @@ namespace ThreadStrike
                 .ToArray());
         }
         
-        private static Try<TReturnType> ExecuteFunc<TReturnType>(
-            ConcurrentQueue<FunctionItem<TReturnType>> funcQueue,
+        private static Try<TResultType> ExecuteFunc<TResultType>(
+            ConcurrentQueue<FunctionItem<TResultType>> funcQueue,
             CancellationTokenManager tokenManager,
+            ProgressManager<TResultType> progressManager,
             SemaphoreSlim semaphore)
         {
             try
@@ -115,27 +128,21 @@ namespace ThreadStrike
                 // Wait so we limit the number of concurrent threads.
                 semaphore.Wait();
 
-                if (tokenManager.IsCancellationRequested)
-                    Try<TReturnType>(new TaskCanceledException());
-                
                 // Get the functions to run from a queue so they are started in the order received.
-                if (funcQueue.TryDequeue(out var funcItem))
-                {
-                    // Run the function wrapped in a Try, which ensures we catch
-                    // any exceptions ourselves and the Task will never be faulted.
-                    var result = Try(() => funcItem.Func()).Strict();
-                    
-                    // If the task threw an exception, if required,
-                    // set the cancellation token to cancel any pending tasks. 
-                    tokenManager.SetCancelIfError(result);
-                    
-                    //Notification of progress.
-                    //NotifyProgress(new ProgressItem(result, funcItem.Idx) )
-                    
-                    return result;
-                }
+                if (!funcQueue.TryDequeue(out var funcItem))
+                    return Try<TResultType>(new Exception("Concurrent Function Error. No items found in queue."));
 
-                return Try<TReturnType>(new Exception("Concurrent Function Error. No items found in queue."));
+                var result = tokenManager.IsCancellationRequested
+                    ? Try<TResultType>(new TaskCanceledException())
+                    : Try(() => funcItem.Func()).Strict();
+
+                // On error, signal cancellation of remaining tasks if required.
+                tokenManager.SetCancelIfError(result);
+                
+                // Report task completion to caller.
+                progressManager.Report(result, funcItem.Idx);
+
+                return result;
             }
             finally { semaphore.Release(); }
         }

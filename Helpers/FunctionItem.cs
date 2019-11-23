@@ -7,10 +7,10 @@ namespace ThreadStrike.Helpers
     /// Allows a clean way to bind a numeric index to a function to allow
     /// better visibility on outputting progress updates.
     /// </summary>
-    /// <typeparam name="TReturnType">The return type of the function.</typeparam>
-    internal class FunctionItem<TReturnType>
+    /// <typeparam name="TResultType">The result type of the function.</typeparam>
+    internal class FunctionItem<TResultType>
     {
-        public FunctionItem(Func<TReturnType> func, int idx)
+        public FunctionItem(Func<TResultType> func, int idx)
         {
             Idx = idx;
             Func = func;
@@ -26,6 +26,6 @@ namespace ThreadStrike.Helpers
         /// <summary>
         /// The function to run.
         /// </summary>
-        public Func<TReturnType> Func { get; }
+        public Func<TResultType> Func { get; }
     }
 }

@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using LanguageExt;
 using ThreadSpark.Core.Extensions;
 using ThreadSpark.Core.Helpers;
-using ThreadSpark.Helpers;
 using static LanguageExt.Prelude;
 
 namespace ThreadSpark.Core

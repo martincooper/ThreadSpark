@@ -1,8 +1,7 @@
 using System;
 using System.Threading;
-using ThreadSpark.Core.Helpers;
 
-namespace ThreadSpark.Helpers
+namespace ThreadSpark.Core.Helpers
 {
     /// <summary>
     /// Settings for Concurrent Function Runner.

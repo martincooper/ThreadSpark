@@ -5,11 +5,11 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using LanguageExt;
-using ThreadStrike.Extensions;
+using ThreadSpark.Extensions;
+using ThreadSpark.Helpers;
 using static LanguageExt.Prelude;
-using ThreadStrike.Helpers;
 
-namespace ThreadStrike
+namespace ThreadSpark
 {
     public class ConcurrentFunctionRunner
     {

@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using LanguageExt;
 
-namespace ThreadStrike.Helpers
+namespace ThreadSpark.Helpers
 {
     /// <summary>
     /// ProgressManager class.

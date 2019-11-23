@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 
-namespace ThreadStrike.Extensions
+namespace ThreadSpark.Extensions
 {
     public static class TaskExtensions
     {

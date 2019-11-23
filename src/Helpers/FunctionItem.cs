@@ -1,6 +1,6 @@
 using System;
 
-namespace ThreadStrike.Helpers
+namespace ThreadSpark.Helpers
 {
     /// <summary>
     /// FunctionItem class.

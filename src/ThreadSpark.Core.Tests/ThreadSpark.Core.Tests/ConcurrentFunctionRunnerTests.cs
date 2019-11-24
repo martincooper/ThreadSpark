@@ -1,14 +1,13 @@
-﻿using NUnit.Framework;
+﻿using Xunit;
 
-namespace ThreadSpark.Core.Tests
+namespace ThreadSpark.Core.Tests 
 {
-    [TestFixture]
     public class ConcurrentFunctionRunnerTests
     {
-        [Test]
+        [Fact]
         public void SampleTest()
         {
-            Assert.IsTrue(true);
+            Assert.True(true);
         }
     }
 }

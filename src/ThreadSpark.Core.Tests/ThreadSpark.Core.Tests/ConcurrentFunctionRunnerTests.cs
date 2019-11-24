@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using NUnit.Framework;
 
 namespace ThreadSpark.Core.Tests 
@@ -11,11 +12,13 @@ namespace ThreadSpark.Core.Tests
         [Test]
         public void SampleTest()
         {
-            var runner = new ConcurrentFunctionRunner(5);
+            var runner = new ConcurrentFunctionRunner(3);
 
-            var funcs = Enumerable.Range(1, 5).Select((rng, idx) => createFunc(idx));
-            runner.Run(funcs);
-            
+            var funcs = Enumerable.Range(1, 20).Select((rng, idx) => createFunc(idx));
+            var result = runner.BeginRun(funcs);
+
+            Console.WriteLine("Starting");
+            var x = result.Result;
             Console.WriteLine("Finished");
             
             Assert.True(true);
@@ -25,8 +28,8 @@ namespace ThreadSpark.Core.Tests
         {
             return () =>
             {
-                Thread.Sleep(100);
                 Console.WriteLine($"Running {idx}.");
+                Task.Delay(400).Wait();
                 return 1;
             };
         }

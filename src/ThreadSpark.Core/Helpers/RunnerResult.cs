@@ -15,7 +15,7 @@ namespace ThreadSpark.Core.Helpers
         public Task<TResultType> Task { get; }
 
         /// <summary>
-        /// Blocking call to get the unwrapped task result when complete.
+        /// Blocking call to get the unwrapped result when all tasks complete.
         /// </summary>
         public TResultType Result => Task.Result;
 

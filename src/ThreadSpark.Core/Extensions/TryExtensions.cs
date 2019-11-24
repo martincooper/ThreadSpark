@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using LanguageExt;
+using static LanguageExt.Prelude;
 
 namespace ThreadSpark.Core.Extensions
 {
@@ -31,6 +34,23 @@ namespace ThreadSpark.Core.Extensions
             return item.Match(
                 Succ: _ => throw new ArgumentException("Error. Exception not valid on a Try/Success."),
                 Fail: err => err);
+        }
+        
+        /// <summary>
+        /// Flattens a collection of Try values.
+        /// If any are failed, then the first failure will be returned,
+        /// else it'll return a collection of TType values.
+        /// </summary>
+        /// <param name="items">The collection of items to flatten.</param>
+        /// <typeparam name="TType">The return type.</typeparam>
+        /// <returns>Returns a collection of flattened values, or the first failure.</returns>
+        public static Try<TType[]> AllOrFirstFail<TType>(this Try<TType>[] items)
+        {
+            var firstFail = items.FirstOrDefault(_ => _.IsFail());
+
+            return firstFail != null
+                ? Try<TType[]>(firstFail.GetException())
+                : Try(items.Select(_ => _.GetValue()).ToArray());
         }
     }
 }

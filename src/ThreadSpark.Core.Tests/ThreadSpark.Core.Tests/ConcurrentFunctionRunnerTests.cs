@@ -10,37 +10,38 @@ namespace ThreadSpark.Core.Tests
     public class ConcurrentFunctionRunnerTests
     {
         [Test]
-        public void SampleTest()
+        public void CheckRunAll()
         {
-            var runner = new ConcurrentFunctionRunner(3);
+            var runner = new ConcurrentFunctionRunner(5);
+            var funcs = Enumerable.Range(0, 20).Select(createFunc);
+            var results = runner.Run(funcs);
 
-            var funcs = Enumerable.Range(1, 20).Select((rng, idx) => createFunc(idx));
-            var result = runner.BeginRun(funcs);
+            Assert.IsTrue(results.Length == 20);
+            Assert.IsTrue(results.All(_ => _.IsSucc()));
 
-            Console.WriteLine("Starting");
-            var x = result.Result;
-            Console.WriteLine("Finished");
-            
-            Assert.True(true);
+            var values = results.AllOrFirstFail().GetValue();
+
+            //for (int idx = 0; idx < values.Length; idx++)
+                //Assert.AreEqual(idx, values[idx] * 5);
         }
 
         Func<int> createFunc(int idx)
         {
             return () =>
             {
-                Console.WriteLine($"Running {idx}.");
-                Task.Delay(1000).Wait();
-                return 1;
+                Console.WriteLine($"Task #{idx}.");
+                Task.Delay(20).Wait();
+                return idx * 5;
             };
         }
 
-        void Test()
+        [Test]
+        public void Test()
         {
             var runner = new ConcurrentFunctionRunner(3);
             
             // Using the Tuple extension methods.
-            var (firstCall, secondCall) = runner.Run(() => 1, () => 2);
+            var (firstCall, secondCall, thirdCall) = runner.Run(() => 1, () => 2, () => 3);
         }
-     
     }
 }

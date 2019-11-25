@@ -13,7 +13,7 @@ namespace ThreadSpark.Core.Tests
         public void CheckRunAll()
         {
             var runner = new ConcurrentFunctionRunner(5);
-            var funcs = Enumerable.Range(0, 20).Select(createFunc);
+            var funcs = Enumerable.Range(0, 20).Select(createFunc).ToArray();
             var results = runner.Run(funcs);
 
             Assert.IsTrue(results.Length == 20);
@@ -21,8 +21,8 @@ namespace ThreadSpark.Core.Tests
 
             var values = results.AllOrFirstFail().GetValue();
 
-            //for (int idx = 0; idx < values.Length; idx++)
-                //Assert.AreEqual(idx, values[idx] * 5);
+            for (int idx = 0; idx < values.Length; idx++)
+                Assert.AreEqual(values[idx], idx * 5);
         }
 
         Func<int> createFunc(int idx)

@@ -46,10 +46,8 @@ namespace ThreadSpark.Core.Extensions
         /// <returns>Returns a collection of flattened values, or the first failure.</returns>
         public static Try<TType[]> AllOrFirstFail<TType>(this Try<TType>[] items)
         {
-            var firstFail = items.FirstOrDefault(_ => _.IsFail());
-
-            return firstFail != null
-                ? Try<TType[]>(firstFail.GetException())
+            return items.Any(_ => _.IsFail())
+                ? Try<TType[]>(items.First(_ => _.IsFail()).GetException())
                 : Try(items.Select(_ => _.GetValue()).ToArray());
         }
     }

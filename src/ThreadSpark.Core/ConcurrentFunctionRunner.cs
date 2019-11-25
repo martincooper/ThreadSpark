@@ -91,7 +91,7 @@ namespace ThreadSpark.Core
             return ProcessTasksAllOrFail(tasks);
         }
         
-        private (int Idx, Try<TResultType> Task)[] Execute<TResultType>(
+        private (int, Try<TResultType>)[] Execute<TResultType>(
             IEnumerable<Func<TResultType>> funcs,
             bool failOnFirstError,
             ConcurrentFunctionSettings<TResultType> settings = null)
@@ -104,15 +104,15 @@ namespace ThreadSpark.Core
             using (var semaphore = new SemaphoreSlim(MaxThreads))
             {
                 var results = allFuncs
-                    .Select((func, idx) => (Idx: idx, Task: Task.Run(() => ExecuteFunc(funcQueue, tokenManager, progressManager, semaphore))))
+                    .Select(func => Task.Run(() => ExecuteFunc(funcQueue, tokenManager, progressManager, semaphore)))
                     .ToArray();
 
                 // Ensure that we wait until all the running tasks are complete so the
                 // Semaphore Slim doesn't get disposed before it's finished running and we exit.
-                var runningTasks = results.Select(_ => _.Task).ToArray<Task>();
+                var runningTasks = results.ToArray<Task>();
                 Task.WaitAll(runningTasks);
-
-                return results.Select(_ => (_.Idx, _.Task.Result)).ToArray();
+                
+                return results.Select(_ => (_.Result.Idx, _.Result.Result)).ToArray();
             }
         }
         
@@ -139,7 +139,7 @@ namespace ThreadSpark.Core
                 .ToArray());
         }
         
-        private static Try<TResultType> ExecuteFunc<TResultType>(
+        private static FunctionResult<TResultType> ExecuteFunc<TResultType>(
             ConcurrentQueue<FunctionItem<TResultType>> funcQueue,
             CancellationTokenManager tokenManager,
             ProgressManager<TResultType> progressManager,
@@ -152,7 +152,7 @@ namespace ThreadSpark.Core
 
                 // Get the functions to run from a queue so they are started in the order received.
                 if (!funcQueue.TryDequeue(out var funcItem))
-                    return Try<TResultType>(new Exception("Concurrent Function Error. No items found in queue."));
+                    return new FunctionResult<TResultType>("Concurrent Function Error. No items found in queue.");
 
                 var result = tokenManager.IsCancellationRequested
                     ? Try<TResultType>(new TaskCanceledException())
@@ -164,7 +164,7 @@ namespace ThreadSpark.Core
                 // Report task completion to caller.
                 progressManager.Report(result, funcItem.Idx);
 
-                return result;
+                return new FunctionResult<TResultType>(result, funcItem.Idx);
             }
             finally { semaphore.Release(); }
         }

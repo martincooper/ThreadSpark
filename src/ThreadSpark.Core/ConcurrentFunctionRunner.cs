@@ -91,32 +91,61 @@ namespace ThreadSpark.Core
             return ProcessTasksAllOrFail(tasks);
         }
         
-        private (int, Try<TResultType>)[] Execute<TResultType>(
+        private FunctionResult<TResultType>[] Execute<TResultType>(
             IEnumerable<Func<TResultType>> funcs,
             bool failOnFirstError,
             ConcurrentFunctionSettings<TResultType> settings = null)
         {
-            var allFuncs = funcs.Select((func, idx) => new FunctionItem<TResultType>(func, idx)).ToArray(); 
-            var funcQueue = new ConcurrentQueue<FunctionItem<TResultType>>(allFuncs);
+            var functionRequests = funcs.Select((func, idx) => new FunctionRequest<TResultType>(func, idx)).ToArray(); 
+            var funcQueue = new ConcurrentQueue<FunctionRequest<TResultType>>(functionRequests);
             var tokenManager = new CancellationTokenManager(settings?.CancellationToken, failOnFirstError);
-            var progressManager = new ProgressManager<TResultType>(settings?.Progress, allFuncs.Length);
+            var progressManager = new ProgressManager<TResultType>(settings?.Progress, functionRequests.Length);
             
             using (var semaphore = new SemaphoreSlim(MaxThreads))
             {
-                var results = allFuncs
+                var results = functionRequests
                     .Select(func => Task.Run(() => ExecuteFunc(funcQueue, tokenManager, progressManager, semaphore)))
                     .ToArray();
 
                 // Ensure that we wait until all the running tasks are complete so the
                 // Semaphore Slim doesn't get disposed before it's finished running and we exit.
-                var runningTasks = results.ToArray<Task>();
-                Task.WaitAll(runningTasks);
-                
-                return results.Select(_ => (_.Result.Idx, _.Result.Result)).ToArray();
+                Task.WaitAll(results.ToArray<Task>());
+
+                return results.Map(c => c.Result).ToArray();
             }
         }
+
+        private static FunctionResult<TResultType> ExecuteFunc<TResultType>(
+            ConcurrentQueue<FunctionRequest<TResultType>> funcQueue,
+            CancellationTokenManager tokenManager,
+            ProgressManager<TResultType> progressManager,
+            SemaphoreSlim semaphore)
+        {
+            try
+            {
+                // Wait so we limit the number of concurrent threads.
+                semaphore.Wait();
+
+                // Get the functions to run from a queue so they are started in the order received.
+                if (!funcQueue.TryDequeue(out var funcRequest))
+                    return new FunctionResult<TResultType>("Concurrent Function Error. No items found in queue.");
+
+                var result = tokenManager.IsCancellationRequested
+                    ? Try<TResultType>(new TaskCanceledException())
+                    : Try(() => funcRequest.Func()).Strict();
+
+                // On error, signal cancellation of remaining tasks if required.
+                tokenManager.SetCancelIfError(result);
+                
+                // Report task completion to caller.
+                progressManager.Report(result, funcRequest.Idx);
+
+                return new FunctionResult<TResultType>(result, funcRequest.Idx);
+            }
+            finally { semaphore.Release(); }
+        }
         
-        private static Try<TResultType>[] ProcessAllTasks<TResultType>((int Idx, Try<TResultType> Result)[] taskResults)
+        private static Try<TResultType>[] ProcessAllTasks<TResultType>(IEnumerable<FunctionResult<TResultType>> taskResults)
         {
             return taskResults
                 .OrderBy(_ => _.Idx)
@@ -124,7 +153,7 @@ namespace ThreadSpark.Core
                 .ToArray();
         }
         
-        private static Try<TResultType[]> ProcessTasksAllOrFail<TResultType>((int Idx, Try<TResultType> Result)[] taskResults)
+        private static Try<TResultType[]> ProcessTasksAllOrFail<TResultType>(FunctionResult<TResultType>[] taskResults)
         {
             var faultedTask = taskResults
                 .Select(_ => _.Result)
@@ -137,36 +166,6 @@ namespace ThreadSpark.Core
                 .OrderBy(_ => _.Idx)
                 .Select(_ => _.Result.GetValue())
                 .ToArray());
-        }
-        
-        private static FunctionResult<TResultType> ExecuteFunc<TResultType>(
-            ConcurrentQueue<FunctionItem<TResultType>> funcQueue,
-            CancellationTokenManager tokenManager,
-            ProgressManager<TResultType> progressManager,
-            SemaphoreSlim semaphore)
-        {
-            try
-            {
-                // Wait so we limit the number of concurrent threads.
-                semaphore.Wait();
-
-                // Get the functions to run from a queue so they are started in the order received.
-                if (!funcQueue.TryDequeue(out var funcItem))
-                    return new FunctionResult<TResultType>("Concurrent Function Error. No items found in queue.");
-
-                var result = tokenManager.IsCancellationRequested
-                    ? Try<TResultType>(new TaskCanceledException())
-                    : Try(() => funcItem.Func()).Strict();
-
-                // On error, signal cancellation of remaining tasks if required.
-                tokenManager.SetCancelIfError(result);
-                
-                // Report task completion to caller.
-                progressManager.Report(result, funcItem.Idx);
-
-                return new FunctionResult<TResultType>(result, funcItem.Idx);
-            }
-            finally { semaphore.Release(); }
         }
     }
 }

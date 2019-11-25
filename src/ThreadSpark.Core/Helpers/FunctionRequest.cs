@@ -3,14 +3,15 @@ using System;
 namespace ThreadSpark.Core.Helpers
 {
     /// <summary>
-    /// FunctionItem class.
-    /// Allows a clean way to bind a numeric index to a function to allow
-    /// better visibility on outputting progress updates.
+    /// FunctionRequest class.
+    /// An un-executed function. Used to bind a numeric index to
+    /// a function to allow better visibility on outputting progress
+    /// updates and correctly ordering returned results.
     /// </summary>
     /// <typeparam name="TResultType">The result type of the function.</typeparam>
-    internal class FunctionItem<TResultType>
+    internal class FunctionRequest<TResultType>
     {
-        public FunctionItem(Func<TResultType> func, int idx)
+        public FunctionRequest(Func<TResultType> func, int idx)
         {
             Idx = idx;
             Func = func;

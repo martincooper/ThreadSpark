@@ -5,13 +5,16 @@ using static LanguageExt.Prelude;
 namespace ThreadSpark.Core.Helpers
 {
     /// <summary>
-    /// FunctionItem class.
-    /// Allows a clean way to bind a numeric index to a function to allow
-    /// better visibility on outputting progress updates.
+    /// FunctionResult class.
+    /// Result of running a function, either the returned value, or an exception.
     /// </summary>
     /// <typeparam name="TResultType">The result type of the function.</typeparam>
     internal class FunctionResult<TResultType>
     {
+        /// <summary>
+        /// Generates the Function Result as an exception.
+        /// </summary>
+        /// <param name="errorMessage">The error message.</param>
         public FunctionResult(string errorMessage)
         {
             Result = Try<TResultType>(new Exception(errorMessage));

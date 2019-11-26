@@ -1,38 +1,38 @@
 ﻿using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using ThreadSpark.Core.Extensions;
+using ThreadSpark.Core.Tests.Helpers;
 
 namespace ThreadSpark.Core.Tests 
 {
     [TestFixture]
     public class ConcurrentFunctionRunnerTests
     {
+        private readonly Random _rnd = new Random();
+        
         [Test]
-        public void CheckRunAll()
+        public void CheckAllPassOnSuccess()
         {
+            var numTasks = 200;
+            
             var runner = new ConcurrentFunctionRunner(5);
-            var funcs = Enumerable.Range(0, 20).Select(createFunc).ToArray();
+            
+            var funcs = Enumerable
+                .Range(0, numTasks)
+                .Select(idx => TestFunctionBuilder.Create(idx)).ToArray();
+            
             var results = runner.Run(funcs);
 
-            Assert.IsTrue(results.Length == 20);
+            Assert.IsTrue(results.Length == numTasks);
             Assert.IsTrue(results.All(_ => _.IsSucc()));
 
             var values = results.AllOrFirstFail().GetValue();
 
             for (int idx = 0; idx < values.Length; idx++)
-                Assert.AreEqual(values[idx], idx * 5);
-        }
-
-        Func<int> createFunc(int idx)
-        {
-            return () =>
-            {
-                Console.WriteLine($"Task #{idx}.");
-                Task.Delay(20).Wait();
-                return idx * 5;
-            };
+                Assert.AreEqual(values[idx], idx * 5, $"Got {values[idx]}, Expected {idx * 5}");
         }
 
         [Test]

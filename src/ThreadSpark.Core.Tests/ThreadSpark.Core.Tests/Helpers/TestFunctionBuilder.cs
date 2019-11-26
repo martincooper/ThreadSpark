@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,6 +13,19 @@ namespace ThreadSpark.Core.Tests.Helpers
     {
         private static readonly Random Rnd = new Random();
 
+        /// <summary>
+        /// Creates a collection of functions which are used in the tests.
+        /// </summary>
+        /// <param name="numTasks">The number of functions required.</param>
+        /// <returns>Returns a collection of test fuctions.</returns>
+        public static Func<int>[] CreateMany(int numTasks)
+        {
+            return Enumerable
+                .Range(0, numTasks)
+                .Select(idx => Create(idx))
+                .ToArray();
+        }
+        
         /// <summary>
         /// Create a simple simulated unit of work to be used in testing.
         /// </summary>

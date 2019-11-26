@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using NUnit.Framework;
 using ThreadSpark.Core.Extensions;
 using ThreadSpark.Core.Tests.Helpers;
@@ -44,5 +45,22 @@ namespace ThreadSpark.Core.Tests
             for (int idx = 0; idx < values.Length; idx++)
                 Assert.AreEqual(values[idx], idx * 5, $"Got {values[idx]}, Expected {idx * 5}");
         }
+        
+        [Test]
+        public void TestNumThreadsCreated()
+        {
+            Console.WriteLine($"Start Threads = {System.Diagnostics.Process.GetCurrentProcess().Threads.Count}");
+            
+            var numTasks = 150;
+            var runner = new ConcurrentFunctionRunner(5);
+            
+            var funcs = TestFunctionBuilder.CreateMany(numTasks);
+            var results = runner.Run(funcs);
+
+            Assert.IsTrue(results.Length == numTasks);
+            Assert.IsTrue(results.All(_ => _.IsSucc()));
+            
+            Console.WriteLine($"End Threads = {System.Diagnostics.Process.GetCurrentProcess().Threads.Count}");
+        }        
     }
 }

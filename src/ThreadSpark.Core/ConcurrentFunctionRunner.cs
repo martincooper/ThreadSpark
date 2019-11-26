@@ -104,7 +104,7 @@ namespace ThreadSpark.Core
             using (var semaphore = new SemaphoreSlim(MaxThreads))
             {
                 var results = functionRequests
-                    .Select(func => Task.Run(() => ExecuteFunc(funcQueue, tokenManager, progressManager, semaphore)))
+                    .Select(func => ExecuteFunc(funcQueue, tokenManager, progressManager, semaphore))
                     .ToArray();
 
                 // Ensure that we wait until all the running tasks are complete so the
@@ -115,7 +115,7 @@ namespace ThreadSpark.Core
             }
         }
 
-        private static FunctionResult<TResultType> ExecuteFunc<TResultType>(
+        private static Task<FunctionResult<TResultType>> ExecuteFunc<TResultType>(
             ConcurrentQueue<FunctionRequest<TResultType>> funcQueue,
             CancellationTokenManager tokenManager,
             ProgressManager<TResultType> progressManager,
@@ -125,24 +125,32 @@ namespace ThreadSpark.Core
             {
                 // Wait so we limit the number of concurrent threads.
                 semaphore.Wait();
-
-                // Get the functions to run from a queue so they are started in the order received.
-                if (!funcQueue.TryDequeue(out var funcRequest))
-                    return new FunctionResult<TResultType>("Concurrent Function Error. No items found in queue.");
-
-                var result = tokenManager.IsCancellationRequested
-                    ? Try<TResultType>(new TaskCanceledException())
-                    : Try(() => funcRequest.Func()).Strict();
-
-                // On error, signal cancellation of remaining tasks if required.
-                tokenManager.SetCancelIfError(result);
                 
-                // Report task completion to caller.
-                progressManager.Report(result, funcRequest.Idx);
-
-                return new FunctionResult<TResultType>(result, funcRequest.Idx);
+                return Task.Run(() => ExecuteFunc(funcQueue, tokenManager, progressManager));
             }
             finally { semaphore.Release(); }
+        }
+        
+        private static FunctionResult<TResultType> ExecuteFunc<TResultType>(
+            ConcurrentQueue<FunctionRequest<TResultType>> funcQueue,
+            CancellationTokenManager tokenManager,
+            ProgressManager<TResultType> progressManager)
+        {
+            // Get the functions to run from a queue so they are started in the order received.
+            if (!funcQueue.TryDequeue(out var funcRequest))
+                return new FunctionResult<TResultType>("Concurrent Function Error. No items found in queue.");
+
+            var result = tokenManager.IsCancellationRequested
+                ? Try<TResultType>(new TaskCanceledException())
+                : Try(() => funcRequest.Func()).Strict();
+
+            // On error, signal cancellation of remaining tasks if required.
+            tokenManager.SetCancelIfError(result);
+            
+            // Report task completion to caller.
+            progressManager.Report(result, funcRequest.Idx);
+
+            return new FunctionResult<TResultType>(result, funcRequest.Idx);
         }
         
         private static Try<TResultType>[] ProcessAllTasks<TResultType>(IEnumerable<FunctionResult<TResultType>> taskResults)

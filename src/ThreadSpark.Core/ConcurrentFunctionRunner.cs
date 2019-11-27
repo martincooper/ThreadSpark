@@ -37,11 +37,11 @@ namespace ThreadSpark.Core
         /// <param name="settings">Settings if required.</param>
         /// <typeparam name="TResultType">The functions result type.</typeparam>
         /// <returns>Returns a collection of results.</returns>
-        public RunnerResult<Try<TResultType>[]> BeginRun<TResultType>(
+        public RunnerResult<Seq<Try<TResultType>>> BeginRun<TResultType>(
             IEnumerable<Func<TResultType>> funcs,
             ConcurrentFunctionSettings<TResultType> settings = null)
         {
-            return new RunnerResult<Try<TResultType>[]>(Task.Run(() => Run(funcs, settings)));
+            return new RunnerResult<Seq<Try<TResultType>>>(Task.Run(() => Run(funcs, settings)));
         }
 
         /// <summary>
@@ -53,7 +53,7 @@ namespace ThreadSpark.Core
         /// <param name="settings">Settings if required.</param>
         /// <typeparam name="TResultType">The functions result type.</typeparam>
         /// <returns>Returns a collection of results.</returns>
-        public Try<TResultType>[] Run<TResultType>(
+        public Seq<Try<TResultType>> Run<TResultType>(
             IEnumerable<Func<TResultType>> funcs,
             ConcurrentFunctionSettings<TResultType> settings = null)
         {
@@ -71,11 +71,11 @@ namespace ThreadSpark.Core
         /// <param name="settings">Settings if required.</param>
         /// <typeparam name="TResultType">The functions result type.</typeparam>
         /// <returns>Returns a collection of results.</returns>
-        public RunnerResult<Try<TResultType[]>> BeginRunUntilError<TResultType>(
+        public RunnerResult<Try<Seq<TResultType>>> BeginRunUntilError<TResultType>(
             IEnumerable<Func<TResultType>> funcs,
             ConcurrentFunctionSettings<TResultType> settings = null)
         {
-            return new RunnerResult<Try<TResultType[]>>(Task.Run(() => RunUntilError(funcs, settings)));
+            return new RunnerResult<Try<Seq<TResultType>>>(Task.Run(() => RunUntilError(funcs, settings)));
         }
         
         /// <summary>
@@ -87,7 +87,7 @@ namespace ThreadSpark.Core
         /// <param name="settings">Settings if required.</param>
         /// <typeparam name="TResultType">The functions result type.</typeparam>
         /// <returns>Returns a collection of results if all succeed, else first failing exception.</returns>
-        public Try<TResultType[]> RunUntilError<TResultType>(
+        public Try<Seq<TResultType>> RunUntilError<TResultType>(
             IEnumerable<Func<TResultType>> funcs,
             ConcurrentFunctionSettings<TResultType> settings = null)
         {
@@ -151,27 +151,18 @@ namespace ThreadSpark.Core
             return new FunctionResult<TResultType>(result, funcRequest.Idx);
         }
         
-        private static Try<TResultType>[] ProcessAllTasks<TResultType>(IEnumerable<FunctionResult<TResultType>> taskResults)
+        private static Seq<Try<TResultType>> ProcessAllTasks<TResultType>(IEnumerable<FunctionResult<TResultType>> taskResults)
         {
             return taskResults
                 .OrderBy(_ => _.Idx)
                 .Select(_ => _.Result)
-                .ToArray();
+                .ToSeq();
         }
         
-        private static Try<TResultType[]> ProcessTasksAllOrFail<TResultType>(FunctionResult<TResultType>[] taskResults)
+        private static Try<Seq<TResultType>> ProcessTasksAllOrFail<TResultType>(FunctionResult<TResultType>[] taskResults)
         {
-            var faultedTask = taskResults
-                .Select(_ => _.Result)
-                .FirstOrDefault(_ => _.IsFail());
-            
-            if (faultedTask != null)
-                return Try<TResultType[]>(faultedTask.GetException());
-
-            return Try(taskResults
-                .OrderBy(_ => _.Idx)
-                .Select(_ => _.Result.GetValue())
-                .ToArray());
+            return ProcessAllTasks(taskResults)
+                .AllOrFirstFail();
         }
     }
 }

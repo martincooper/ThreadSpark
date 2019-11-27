@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using NUnit.Framework;
 using ThreadSpark.Core.Extensions;
 using ThreadSpark.Core.Tests.Helpers;
@@ -19,7 +18,7 @@ namespace ThreadSpark.Core.Tests
             var results = runner.Run(funcs);
 
             // Check there is the expected number of results returned.
-            Assert.IsTrue(results.Length == numTasks);
+            Assert.IsTrue(results.Count == numTasks);
             
             // Check that they have all succeeded.
             Assert.IsTrue(results.All(_ => _.IsSucc()));
@@ -34,11 +33,11 @@ namespace ThreadSpark.Core.Tests
             var funcs = TestFunctionBuilder.CreateMany(numTasks);
             var results = runner.Run(funcs);
 
-            Assert.IsTrue(results.Length == numTasks);
+            Assert.IsTrue(results.Count == numTasks);
             Assert.IsTrue(results.All(_ => _.IsSucc()));
 
             // Get all the result values.
-            var values = results.AllOrFirstFail().GetValue();
+            var values = results.AllOrFirstFail().GetValue().ToArray();
 
             // Check the index of each result, and check against it's return value to ensure
             // that the order of the returned results is the same as the order the tasks were sent.
@@ -57,7 +56,7 @@ namespace ThreadSpark.Core.Tests
             var funcs = TestFunctionBuilder.CreateMany(numTasks);
             var results = runner.Run(funcs);
 
-            Assert.IsTrue(results.Length == numTasks);
+            Assert.IsTrue(results.Count == numTasks);
             Assert.IsTrue(results.All(_ => _.IsSucc()));
             
             Console.WriteLine($"End Threads = {System.Diagnostics.Process.GetCurrentProcess().Threads.Count}");

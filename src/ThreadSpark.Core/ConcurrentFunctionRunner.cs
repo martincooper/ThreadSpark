@@ -95,7 +95,7 @@ namespace ThreadSpark.Core
             return ProcessTasksAllOrFail(tasks);
         }
         
-        private FunctionResult<TResultType>[] Execute<TResultType>(
+        private Seq<FunctionResult<TResultType>> Execute<TResultType>(
             IEnumerable<Func<TResultType>> funcs,
             bool failOnFirstError,
             ConcurrentFunctionSettings<TResultType> settings = null)
@@ -112,8 +112,8 @@ namespace ThreadSpark.Core
             // Ensure that we wait until all the running tasks are complete so the
             // Semaphore Slim doesn't get disposed before it's finished running and we exit.
             Task.WaitAll(results.ToArray<Task>());
-
-            return results.Map(c => c.Result).ToArray();
+            
+            return results.Map(c => c.Result).ToSeq();
         }
 
         private Task<FunctionResult<TResultType>> ExecuteFuncWhenReady<TResultType>(
@@ -159,7 +159,7 @@ namespace ThreadSpark.Core
                 .ToSeq();
         }
         
-        private static Try<Seq<TResultType>> ProcessTasksAllOrFail<TResultType>(FunctionResult<TResultType>[] taskResults)
+        private static Try<Seq<TResultType>> ProcessTasksAllOrFail<TResultType>(Seq<FunctionResult<TResultType>> taskResults)
         {
             return ProcessAllTasks(taskResults)
                 .AllOrFirstFail();

@@ -13,10 +13,14 @@ namespace ThreadSpark.Core
 {
     public class ConcurrentFunctionRunner
     {
+        private readonly SemaphoreSlim _semaphore;
+        
         public ConcurrentFunctionRunner(int maxThreads)
         {
             if (maxThreads <= 0)
                 throw new ArgumentOutOfRangeException(nameof(maxThreads), "Max threads cannot be less than 1.");
+            
+            _semaphore = new SemaphoreSlim(maxThreads);
             
             MaxThreads = maxThreads;
         }
@@ -101,34 +105,28 @@ namespace ThreadSpark.Core
             var tokenManager = new CancellationTokenManager(settings?.CancellationToken, failOnFirstError);
             var progressManager = new ProgressManager<TResultType>(settings?.Progress, functionRequests.Length);
             
-            using (var semaphore = new SemaphoreSlim(MaxThreads))
-            {
-                var results = functionRequests
-                    .Select(func => ExecuteFunc(funcQueue, tokenManager, progressManager, semaphore))
-                    .ToArray();
+            var results = functionRequests
+                .Select(func => ExecuteFuncWhenReady(funcQueue, tokenManager, progressManager))
+                .ToArray();
 
-                // Ensure that we wait until all the running tasks are complete so the
-                // Semaphore Slim doesn't get disposed before it's finished running and we exit.
-                Task.WaitAll(results.ToArray<Task>());
+            // Ensure that we wait until all the running tasks are complete so the
+            // Semaphore Slim doesn't get disposed before it's finished running and we exit.
+            Task.WaitAll(results.ToArray<Task>());
 
-                return results.Map(c => c.Result).ToArray();
-            }
+            return results.Map(c => c.Result).ToArray();
         }
 
-        private static Task<FunctionResult<TResultType>> ExecuteFunc<TResultType>(
+        private Task<FunctionResult<TResultType>> ExecuteFuncWhenReady<TResultType>(
             ConcurrentQueue<FunctionRequest<TResultType>> funcQueue,
             CancellationTokenManager tokenManager,
-            ProgressManager<TResultType> progressManager,
-            SemaphoreSlim semaphore)
+            ProgressManager<TResultType> progressManager)
         {
-            try
-            {
-                // Wait so we limit the number of concurrent threads.
-                semaphore.Wait();
-                
-                return Task.Run(() => ExecuteFunc(funcQueue, tokenManager, progressManager));
-            }
-            finally { semaphore.Release(); }
+            // Wait so we limit the number of concurrent threads.
+            _semaphore.Wait();
+            
+            return Task
+                .Run(() => ExecuteFunc(funcQueue, tokenManager, progressManager))
+                .ContinueWith(task => { _semaphore.Release(); return task.Result; });
         }
         
         private static FunctionResult<TResultType> ExecuteFunc<TResultType>(

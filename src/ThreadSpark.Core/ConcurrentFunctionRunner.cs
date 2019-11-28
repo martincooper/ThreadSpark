@@ -101,12 +101,11 @@ namespace ThreadSpark.Core
             ConcurrentFunctionSettings<TResultType> settings = null)
         {
             var functionRequests = funcs.Select((func, idx) => new FunctionRequest<TResultType>(func, idx)).ToArray(); 
-            var funcQueue = new ConcurrentQueue<FunctionRequest<TResultType>>(functionRequests);
             var tokenManager = new CancellationTokenManager(settings?.CancellationToken, failOnFirstError);
             var progressManager = new ProgressManager<TResultType>(settings?.Progress, functionRequests.Length);
             
             var results = functionRequests
-                .Select(func => ExecuteFuncWhenReady(funcQueue, tokenManager, progressManager))
+                .Select(func => ExecuteFuncWhenReady(func, tokenManager, progressManager))
                 .ToArray();
 
             // Ensure that we wait until all the running tasks are complete so the
@@ -117,7 +116,7 @@ namespace ThreadSpark.Core
         }
 
         private Task<FunctionResult<TResultType>> ExecuteFuncWhenReady<TResultType>(
-            ConcurrentQueue<FunctionRequest<TResultType>> funcQueue,
+            FunctionRequest<TResultType> funcRequest,
             CancellationTokenManager tokenManager,
             ProgressManager<TResultType> progressManager)
         {
@@ -125,19 +124,15 @@ namespace ThreadSpark.Core
             _semaphore.Wait();
             
             return Task
-                .Run(() => ExecuteFunc(funcQueue, tokenManager, progressManager))
+                .Run(() => ExecuteFunc(funcRequest, tokenManager, progressManager))
                 .ContinueWith(task => { _semaphore.Release(); return task.Result; });
         }
         
         private static FunctionResult<TResultType> ExecuteFunc<TResultType>(
-            ConcurrentQueue<FunctionRequest<TResultType>> funcQueue,
+            FunctionRequest<TResultType> funcRequest,
             CancellationTokenManager tokenManager,
             ProgressManager<TResultType> progressManager)
         {
-            // Get the functions to run from a queue so they are started in the order received.
-            if (!funcQueue.TryDequeue(out var funcRequest))
-                return new FunctionResult<TResultType>("Concurrent Function Error. No items found in queue.");
-
             var result = tokenManager.IsCancellationRequested
                 ? Try<TResultType>(new TaskCanceledException())
                 : Try(() => funcRequest.Func()).Strict();

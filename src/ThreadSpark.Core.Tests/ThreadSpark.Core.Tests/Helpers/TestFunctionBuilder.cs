@@ -48,9 +48,10 @@ namespace ThreadSpark.Core.Tests.Helpers
             {
                 var currentThread = Thread.CurrentThread.ManagedThreadId;
                 var threadCount = System.Diagnostics.Process.GetCurrentProcess().Threads.Count;
+                var startTime = DateTime.Now.ToString("HH:mm:ss:ffff");
                 
                 // Useful output for debugging.
-                Console.WriteLine($"TaskIdx #{idx} : Returns#{returnVal} : Thread #{currentThread} : ThreadCount #{threadCount}");
+                Console.WriteLine($"TaskIdx #{idx} : Started {startTime} : Returns {returnVal} : Thread #{currentThread} : ThreadCount #{threadCount}");
                 
                 // Wait a small, but random amount of time to simulate more realistic scenario
                 // and ensuring that the tasks don't finish at the same time or in the same order.

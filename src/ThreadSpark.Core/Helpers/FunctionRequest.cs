@@ -1,4 +1,5 @@
 using System;
+using LanguageExt;
 
 namespace ThreadSpark.Core.Helpers
 {
@@ -11,7 +12,7 @@ namespace ThreadSpark.Core.Helpers
     /// <typeparam name="TResultType">The result type of the function.</typeparam>
     internal class FunctionRequest<TResultType>
     {
-        public FunctionRequest(Func<TResultType> func, int idx)
+        public FunctionRequest(Func<Try<TResultType>> func, int idx)
         {
             Idx = idx;
             Func = func;
@@ -27,6 +28,6 @@ namespace ThreadSpark.Core.Helpers
         /// <summary>
         /// The function to run.
         /// </summary>
-        public Func<TResultType> Func { get; }
+        public Func<Try<TResultType>> Func { get; }
     }
 }

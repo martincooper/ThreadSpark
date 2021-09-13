@@ -1,10 +1,124 @@
 using System;
+using System.Collections.Generic;
 using LanguageExt;
+using ThreadSpark.Core.Helpers;
 
 namespace ThreadSpark.Core.Extensions
 {
     public static class ConcurrentFunctionRunnerExtensions
     {
+        /// <summary>
+        /// Runs all the supplied functions concurrently, limited to the specified Max Threads.
+        /// </summary>
+        /// <param name="funcs">The functions to run concurrently.</param>
+        /// <param name="maxThreads">The Max Threads to run.</param>
+        /// <param name="settings">Settings if required.</param>
+        /// <typeparam name="TResultType">The functions result type.</typeparam>
+        /// <returns>Returns a collection of results.</returns>
+        public static Try<TResultType>[] RunConcurrently<TResultType>(
+            this IEnumerable<Func<TResultType>> funcs,
+            int maxThreads,
+            ConcurrentFunctionSettings<TResultType> settings = null) =>
+                new ConcurrentFunctionRunner(maxThreads).Run(funcs);
+
+        /// <summary>
+        /// Runs all the supplied functions concurrently, limited to the specified Max Threads.
+        /// </summary>
+        /// <param name="funcs">The functions to run concurrently.</param>
+        /// <param name="maxThreads">The Max Threads to run.</param>
+        /// <param name="settings">Settings if required.</param>
+        /// <typeparam name="TResultType">The functions result type.</typeparam>
+        /// <returns>Returns a collection of results.</returns>
+        public static Try<TResultType>[] RunConcurrently<TResultType>(
+            this IEnumerable<Func<Try<TResultType>>> funcs,
+            int maxThreads,
+            ConcurrentFunctionSettings<TResultType> settings = null) =>
+                new ConcurrentFunctionRunner(maxThreads).Run(funcs);
+
+        /// <summary>
+        /// Runs all the supplied functions concurrently, limited to the specified Max Threads.
+        /// </summary>
+        /// <param name="funcs">The functions to run concurrently.</param>
+        /// <param name="maxThreads">The Max Threads to run.</param>
+        /// <param name="settings">Settings if required.</param>
+        /// <typeparam name="TResultType">The functions result type.</typeparam>
+        /// <returns>Returns a collection of results.</returns>
+        public static Try<TResultType[]> RunConcurrentlyUntilError<TResultType>(
+            this IEnumerable<Func<TResultType>> funcs,
+            int maxThreads,
+            ConcurrentFunctionSettings<TResultType> settings = null) =>
+                new ConcurrentFunctionRunner(maxThreads).RunUntilError(funcs);
+
+        /// <summary>
+        /// Runs all the supplied functions concurrently, limited to the specified Max Threads.
+        /// </summary>
+        /// <param name="funcs">The functions to run concurrently.</param>
+        /// <param name="maxThreads">The Max Threads to run.</param>
+        /// <param name="settings">Settings if required.</param>
+        /// <typeparam name="TResultType">The functions result type.</typeparam>
+        /// <returns>Returns a collection of results.</returns>
+        public static Try<TResultType[]> RunConcurrentlyUntilError<TResultType>(
+            this IEnumerable<Func<Try<TResultType>>> funcs,
+            int maxThreads,
+            ConcurrentFunctionSettings<TResultType> settings = null) =>
+                new ConcurrentFunctionRunner(maxThreads).RunUntilError(funcs);
+
+        /// <summary>
+        /// Runs all the supplied functions concurrently, limited to the specified Max Threads.
+        /// </summary>
+        /// <param name="funcs">The functions to run concurrently.</param>
+        /// <param name="maxThreads">The Max Threads to run.</param>
+        /// <param name="settings">Settings if required.</param>
+        /// <typeparam name="TResultType">The functions result type.</typeparam>
+        /// <returns>Returns a collection of results.</returns>
+        public static RunnerResult<Try<TResultType>[]> BeginRunConcurrently<TResultType>(
+            this IEnumerable<Func<TResultType>> funcs,
+            int maxThreads,
+            ConcurrentFunctionSettings<TResultType> settings = null) =>
+                new ConcurrentFunctionRunner(maxThreads).BeginRun(funcs);
+
+        /// <summary>
+        /// Runs all the supplied functions concurrently, limited to the specified Max Threads.
+        /// </summary>
+        /// <param name="funcs">The functions to run concurrently.</param>
+        /// <param name="maxThreads">The Max Threads to run.</param>
+        /// <param name="settings">Settings if required.</param>
+        /// <typeparam name="TResultType">The functions result type.</typeparam>
+        /// <returns>Returns a collection of results.</returns>
+        public static RunnerResult<Try<TResultType>[]> BeginRunConcurrently<TResultType>(
+            this IEnumerable<Func<Try<TResultType>>> funcs,
+            int maxThreads,
+            ConcurrentFunctionSettings<TResultType> settings = null) =>
+                new ConcurrentFunctionRunner(maxThreads).BeginRun(funcs);
+
+        /// <summary>
+        /// Runs all the supplied functions concurrently, limited to the specified Max Threads.
+        /// </summary>
+        /// <param name="funcs">The functions to run concurrently.</param>
+        /// <param name="maxThreads">The Max Threads to run.</param>
+        /// <param name="settings">Settings if required.</param>
+        /// <typeparam name="TResultType">The functions result type.</typeparam>
+        /// <returns>Returns a collection of results.</returns>
+        public static RunnerResult<Try<TResultType[]>> BeginRunConcurrentlyUntilError<TResultType>(
+            this IEnumerable<Func<TResultType>> funcs,
+            int maxThreads,
+            ConcurrentFunctionSettings<TResultType> settings = null) =>
+                new ConcurrentFunctionRunner(maxThreads).BeginRunUntilError(funcs);
+
+        /// <summary>
+        /// Runs all the supplied functions concurrently, limited to the specified Max Threads.
+        /// </summary>
+        /// <param name="funcs">The functions to run concurrently.</param>
+        /// <param name="maxThreads">The Max Threads to run.</param>
+        /// <param name="settings">Settings if required.</param>
+        /// <typeparam name="TResultType">The functions result type.</typeparam>
+        /// <returns>Returns a collection of results.</returns>
+        public static RunnerResult<Try<TResultType[]>> BeginRunConcurrentlyUntilError<TResultType>(
+            this IEnumerable<Func<Try<TResultType>>> funcs,
+            int maxThreads,
+            ConcurrentFunctionSettings<TResultType> settings = null) =>
+                new ConcurrentFunctionRunner(maxThreads).BeginRunUntilError(funcs);
+
         /// <summary>
         /// Extension Function to allow a cleaner way to access task results through named tuples.
         /// </summary>

@@ -44,11 +44,20 @@ namespace ThreadSpark.Core.Extensions
         /// <param name="items">The collection of items to flatten.</param>
         /// <typeparam name="TType">The return type.</typeparam>
         /// <returns>Returns a collection of flattened values, or the first failure.</returns>
-        public static Try<Seq<TType>> AllOrFirstFail<TType>(this Seq<Try<TType>> items)
-        {
-            return items.Any(_ => _.IsFail())
-                ? Try<Seq<TType>>(items.First(_ => _.IsFail()).GetException())
+        public static Try<IEnumerable<TType>> AllOrFirstFail<TType>(this IEnumerable<Try<TType>> items) =>
+            items.Any(_ => _.IsFail())
+                ? Try<IEnumerable<TType>>(items.First(_ => _.IsFail()).GetException())
                 : Try(items.Select(_ => _.GetValue()));
-        }
+
+        /// <summary>
+        /// Flattens a collection of Try values.
+        /// If any are failed, then the first failure will be returned,
+        /// else it'll return a collection of TType values.
+        /// </summary>
+        /// <param name="items">The collection of items to flatten.</param>
+        /// <typeparam name="TType">The return type.</typeparam>
+        /// <returns>Returns a collection of flattened values, or the first failure.</returns>
+        public static Try<IEnumerable<TType>> AllOrFirstFail<TType>(this Seq<Try<TType>> items) => 
+            AllOrFirstFail(items.ToArray());
     }
 }

@@ -36,11 +36,41 @@ namespace ThreadSpark.Core
         /// <param name="settings">Settings if required.</param>
         /// <typeparam name="TResultType">The functions result type.</typeparam>
         /// <returns>Returns a collection of results.</returns>
-        public RunnerResult<Seq<Try<TResultType>>> BeginRun<TResultType>(
+        public RunnerResult<Try<TResultType>[]> BeginRun<TResultType>(
+            IEnumerable<Func<TResultType>> funcs,
+            ConcurrentFunctionSettings<TResultType> settings = null) =>
+                new RunnerResult<Try<TResultType>[]>(Task.Run(() => Run(funcs, settings)));
+
+        /// <summary>
+        /// Runs all the supplied functions concurrently, limited to the specified Max Threads.
+        /// Returns a RunnerResult object which can be used to wait for all tasks
+        /// to be finished before checking the results.
+        /// Runs all, any errors returned in the Try Result.
+        /// </summary>
+        /// <param name="funcs">The functions to run concurrently.</param>
+        /// <param name="settings">Settings if required.</param>
+        /// <typeparam name="TResultType">The functions result type.</typeparam>
+        /// <returns>Returns a collection of results.</returns>
+        public RunnerResult<Try<TResultType>[]> BeginRun<TResultType>(
+            IEnumerable<Func<Try<TResultType>>> funcs,
+            ConcurrentFunctionSettings<TResultType> settings = null) =>
+                new RunnerResult<Try<TResultType>[]>(Task.Run(() => Run(funcs, settings)));
+
+        /// <summary>
+        /// Runs all the supplied functions concurrently, limited to the specified Max Threads.
+        /// Blocks the executing thread until finished, then returns a
+        /// collection of Try results, one for each request.
+        /// </summary>
+        /// <param name="funcs">The functions to run concurrently.</param>
+        /// <param name="settings">Settings if required.</param>
+        /// <typeparam name="TResultType">The functions result type.</typeparam>
+        /// <returns>Returns a collection of results.</returns>
+        public Try<TResultType>[] Run<TResultType>(
             IEnumerable<Func<TResultType>> funcs,
             ConcurrentFunctionSettings<TResultType> settings = null)
         {
-            return new RunnerResult<Seq<Try<TResultType>>>(Task.Run(() => Run(funcs, settings)));
+            var tryFuncs = funcs.Select(f => fun(() => Try(() => f())));
+            return Run(tryFuncs);
         }
 
         /// <summary>
@@ -52,12 +82,12 @@ namespace ThreadSpark.Core
         /// <param name="settings">Settings if required.</param>
         /// <typeparam name="TResultType">The functions result type.</typeparam>
         /// <returns>Returns a collection of results.</returns>
-        public Seq<Try<TResultType>> Run<TResultType>(
-            IEnumerable<Func<TResultType>> funcs,
+        public Try<TResultType>[] Run<TResultType>(
+            IEnumerable<Func<Try<TResultType>>> funcs,
             ConcurrentFunctionSettings<TResultType> settings = null)
         {
             var tasks = Execute(funcs, false, settings);
-            return ProcessAllTasks(tasks);
+            return ProcessAllTasks(tasks).ToArray();
         }
 
         /// <summary>
@@ -70,13 +100,26 @@ namespace ThreadSpark.Core
         /// <param name="settings">Settings if required.</param>
         /// <typeparam name="TResultType">The functions result type.</typeparam>
         /// <returns>Returns a collection of results.</returns>
-        public RunnerResult<Try<Seq<TResultType>>> BeginRunUntilError<TResultType>(
+        public RunnerResult<Try<TResultType[]>> BeginRunUntilError<TResultType>(
             IEnumerable<Func<TResultType>> funcs,
-            ConcurrentFunctionSettings<TResultType> settings = null)
-        {
-            return new RunnerResult<Try<Seq<TResultType>>>(Task.Run(() => RunUntilError(funcs, settings)));
-        }
-        
+            ConcurrentFunctionSettings<TResultType> settings = null) =>
+                new RunnerResult<Try<TResultType[]>>(Task.Run(() => RunUntilError(funcs, settings)));
+
+        /// <summary>
+        /// Runs all the supplied functions concurrently, limited to the specified Max Threads.
+        /// Returns a RunnerResult object which can be used to wait for all tasks
+        /// to be finished before checking the results.
+        /// Runs until the first error and aborts, else returns all results.
+        /// </summary>
+        /// <param name="funcs">The functions to run concurrently.</param>
+        /// <param name="settings">Settings if required.</param>
+        /// <typeparam name="TResultType">The functions result type.</typeparam>
+        /// <returns>Returns a collection of results.</returns>
+        public RunnerResult<Try<TResultType[]>> BeginRunUntilError<TResultType>(
+            IEnumerable<Func<Try<TResultType>>> funcs,
+            ConcurrentFunctionSettings<TResultType> settings = null) =>
+                new RunnerResult<Try<TResultType[]>>(Task.Run(() => RunUntilError(funcs, settings)));
+
         /// <summary>
         /// Runs all the supplied functions concurrently limited to the specified Max Threads.
         /// Blocks the executing thread until finished.
@@ -86,16 +129,33 @@ namespace ThreadSpark.Core
         /// <param name="settings">Settings if required.</param>
         /// <typeparam name="TResultType">The functions result type.</typeparam>
         /// <returns>Returns a collection of results if all succeed, else first failing exception.</returns>
-        public Try<Seq<TResultType>> RunUntilError<TResultType>(
+        public Try<TResultType[]> RunUntilError<TResultType>(
             IEnumerable<Func<TResultType>> funcs,
             ConcurrentFunctionSettings<TResultType> settings = null)
         {
-            var tasks = Execute(funcs, true, settings);
-            return ProcessTasksAllOrFail(tasks);
+            var tryFuncs = funcs.Select(f => fun(() => Try(() => f())));
+            return RunUntilError(tryFuncs);
         }
-        
+
+        /// <summary>
+        /// Runs all the supplied functions concurrently limited to the specified Max Threads.
+        /// Blocks the executing thread until finished.
+        /// Will run until a task fails with an exception, and will return early, not running remaining tasks.
+        /// </summary>
+        /// <param name="funcs">The functions to run concurrently.</param>
+        /// <param name="settings">Settings if required.</param>
+        /// <typeparam name="TResultType">The functions result type.</typeparam>
+        /// <returns>Returns a collection of results if all succeed, else first failing exception.</returns>
+        public Try<TResultType[]> RunUntilError<TResultType>(
+            IEnumerable<Func<Try<TResultType>>> funcs,
+            ConcurrentFunctionSettings<TResultType> settings = null)
+        {
+            var tasks = Execute(funcs, true, settings);
+            return ProcessTasksAllOrFail(tasks).Map(_ => _.ToArray());
+        }
+
         private Seq<FunctionResult<TResultType>> Execute<TResultType>(
-            IEnumerable<Func<TResultType>> funcs,
+            IEnumerable<Func<Try<TResultType>>> funcs,
             bool failOnFirstError,
             ConcurrentFunctionSettings<TResultType> settings = null)
         {
@@ -134,7 +194,7 @@ namespace ThreadSpark.Core
         {
             var result = tokenManager.IsCancellationRequested
                 ? Try<TResultType>(new TaskCanceledException())
-                : Try(() => funcRequest.Func()).Strict();
+                : funcRequest.Func().Strict();
 
             // On error, signal cancellation of remaining tasks if required.
             tokenManager.SetCancelIfError(result);
@@ -144,19 +204,14 @@ namespace ThreadSpark.Core
 
             return new FunctionResult<TResultType>(result, funcRequest.Idx);
         }
-        
-        private static Seq<Try<TResultType>> ProcessAllTasks<TResultType>(IEnumerable<FunctionResult<TResultType>> taskResults)
-        {
-            return taskResults
+
+        private static IEnumerable<Try<TResultType>> ProcessAllTasks<TResultType>(IEnumerable<FunctionResult<TResultType>> taskResults) =>
+            taskResults
                 .OrderBy(_ => _.Idx)
-                .Select(_ => _.Result)
-                .ToSeq();
-        }
+                .Select(_ => _.Result);
         
-        private static Try<Seq<TResultType>> ProcessTasksAllOrFail<TResultType>(Seq<FunctionResult<TResultType>> taskResults)
-        {
-            return ProcessAllTasks(taskResults)
+        private static Try<IEnumerable<TResultType>> ProcessTasksAllOrFail<TResultType>(IEnumerable<FunctionResult<TResultType>> taskResults) =>
+            ProcessAllTasks(taskResults)
                 .AllOrFirstFail();
-        }
     }
 }

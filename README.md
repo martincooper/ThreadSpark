@@ -15,6 +15,22 @@ ThreadSpark is a lightweight library which simplifies concurrency and multi-thre
 ## Examples
 
 ```csharp
+// Build a collection of functions which each one will be on a seperate thread.
+var funcs = Enumerable
+	.Range(1, 100)
+	.Select(idx => fun(() => idx * 100));
+
+// Set to run with 10 threads.
+var runner = new ConcurrentFunctionRunner(10);
+var result = runner.Run(funcs);
+
+Assert.IsTrue(result.IsSucc());
+Assert.AreEqual(result.GetValue().Length, 100);
+```
+
+
+```csharp
+// Using the extension method to inline the call.
 // Runs concurrently and returns all the successful results, or the first one which failed.
 var result = Enumerable
 	.Range(1, 100)

@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Linq;
+using System.Threading;
 using NUnit.Framework;
 using ThreadSpark.Core.Extensions;
 using ThreadSpark.Core.Tests.Helpers;
+using static LanguageExt.Prelude;
 
 namespace ThreadSpark.Core.Tests 
 {
@@ -61,6 +63,31 @@ namespace ThreadSpark.Core.Tests
             Assert.IsTrue(results.All(_ => _.IsSucc()));
             
             Console.WriteLine($"End Threads = {System.Diagnostics.Process.GetCurrentProcess().Threads.Count}");
-        }        
+        }
+
+        [Test]
+        public void TestRunConcurrentlyUntilError()
+        {
+            // Runs concurrently and returns all the successful results, or the first one which failed.
+            var result = Enumerable
+                .Range(1, 100)
+                .Select(idx => fun(() => idx * 100))
+                .RunConcurrentlyUntilError(10);
+
+            Assert.IsTrue(result.IsSucc());
+            Assert.AreEqual(result.GetValue().Length, 100);
+        }
+
+        [Test]
+        public void TestRunConcurrently()
+        {
+            // Runs concurrently and returns each Try<T> item which is either a Success or Failure (with exception).
+            var result = Enumerable
+                .Range(1, 100)
+                .Select(idx => fun(() => idx * 100))
+                .RunConcurrently(10);
+
+            Assert.AreEqual(result.Length, 100);
+        }
     }
 }

@@ -15,7 +15,7 @@ ThreadSpark is a lightweight library which simplifies concurrency and multi-thre
 ## Examples
 
 Builds a collection of functions which will all be run on a seperate thread.
-It returns a collection of Try<T> values, each one can be individually cheked for Success / Failure.
+It returns a collection of Try<T> values, each one can be individually checked for Success / Failure.
 ```csharp
 var funcs = Enumerable
 	.Range(1, 100)
@@ -28,6 +28,7 @@ var result = runner.Run(funcs);
 Assert.IsTrue(result.IsSucc());
 Assert.AreEqual(result.GetValue().Length, 100);
 ```
+
 
 Builds a collection of functions which will all be run on a seperate thread.
 Using "Run Until Error" will return the aggregated results if ALL successful, or the first failure which occurred.
